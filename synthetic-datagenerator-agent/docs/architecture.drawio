@@ -1,0 +1,60 @@
+<mxfile host="app.diagrams.net" version="24.7.17">
+  <diagram id="crewai-pipeline" name="CrewAI Pipeline">
+    <mxGraphModel dx="1000" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="700" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Data Contract -&gt; Fake Data Generator&#10;CrewAI Pipeline (7 sequential steps)" style="text;html=1;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="130" y="10" width="440" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="input" value="Input&#10;ODCS data contract + reference DuckDBs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="80" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step1" value="1 · Contract Analyst&#10;Parse the ODCS contract into a schema" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="190" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step2" value="2 · Source Data Profiler&#10;Profile real data distributions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="300" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step3" value="3 · SCD2 Pattern Analyst&#10;Mine real SCD2 change patterns" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="410" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step4" value="4 · Distribution &amp; Change Analyst&#10;Infer generation hints (reasoning only, no tool)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="520" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step5" value="5 · Synthetic Data Engineer&#10;Generate the initial fake data batch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="630" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step6" value="6 · Change Data Specialist&#10;Simulate SCD2 change batches" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="740" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step7" value="7 · Data Quality Analyst&#10;Validate data and assess SCD2 readiness" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="850" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="output" value="Output&#10;Validation report (printed by src/main.py)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="150" y="960" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" style="html=1;endArrow=block;rounded=0;" edge="1" parent="1" source="input" target="step1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="html=1;endArrow=block;rounded=0;" edge="1" parent="1" source="step1" target="step2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="html=1;endArrow=block;rounded=0;" edge="1" parent="1" source="step2" target="step3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="html=1;endArrow=block;rounded=0;" edge="1" parent="1" source="step3" target="step4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="html=1;endArrow=block;rounded=0;" edge="1" parent="1" source="step4" target="step5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="html=1;endArrow=block;rounded=0;" edge="1" parent="1" source="step5" target="step6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="html=1;endArrow=block;rounded=0;" edge="1" parent="1" source="step6" target="step7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" style="html=1;endArrow=block;rounded=0;" edge="1" parent="1" source="step7" target="output"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

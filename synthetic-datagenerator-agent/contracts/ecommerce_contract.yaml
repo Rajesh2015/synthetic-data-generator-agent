@@ -1,0 +1,221 @@
+apiVersion: v3.1.0
+kind: DataContract
+id: ecommerce-data-contract-v1
+
+info:
+  title: E-Commerce Core Data Contract
+  version: 1.0.0
+  description: >
+    Data contract for e-commerce core entities: customers, products, and orders.
+    Intended for dev/test fake data generation with referential integrity and
+    SCD2-ready change simulation.
+  owner: data-engineering
+  contact:
+    name: Data Engineering Team
+    email: data-engineering@example.com
+  tags:
+    - ecommerce
+    - core
+    - dev
+
+servers:
+  dev:
+    type: duckdb
+    environment: dev
+    path: ./data/ecommerce_dev.duckdb
+
+models:
+
+  customers:
+    type: table
+    description: Core customer master data.
+    fields:
+      customer_id:
+        type: integer
+        description: Surrogate primary key
+        primaryKey: true
+        unique: true
+        required: true
+      customer_code:
+        type: string
+        description: Business natural key
+        unique: true
+        required: true
+        pattern: "CUST-[0-9]{6}"
+      first_name:
+        type: string
+        description: Customer first name
+        required: true
+        maxLength: 50
+      last_name:
+        type: string
+        description: Customer last name
+        required: true
+        maxLength: 50
+      email:
+        type: string
+        description: Contact email address
+        required: true
+        unique: true
+        format: email
+      phone:
+        type: string
+        description: Contact phone number
+        required: false
+      address_line1:
+        type: string
+        description: Primary street address
+        required: false
+        maxLength: 100
+      city:
+        type: string
+        description: City
+        required: false
+        maxLength: 50
+      country_code:
+        type: string
+        description: ISO 3166-1 alpha-2 country code
+        required: true
+        minLength: 2
+        maxLength: 2
+        enum: [US, GB, DE, FR, AU, IN, CA, SG]
+      status:
+        type: string
+        description: Customer account status
+        required: true
+        enum: [active, inactive, suspended]
+        default: active
+      created_at:
+        type: timestamp
+        description: Record creation timestamp
+        required: true
+    quality:
+      - type: uniqueness
+        field: customer_code
+      - type: completeness
+        field: email
+        threshold: 1.0
+
+  products:
+    type: table
+    description: Product catalog.
+    fields:
+      product_id:
+        type: integer
+        description: Surrogate primary key
+        primaryKey: true
+        unique: true
+        required: true
+      product_code:
+        type: string
+        description: Business natural key (SKU)
+        unique: true
+        required: true
+        pattern: "SKU-[A-Z]{3}-[0-9]{4}"
+      product_name:
+        type: string
+        description: Display name of the product
+        required: true
+        maxLength: 150
+      category:
+        type: string
+        description: Product category
+        required: true
+        enum: [Electronics, Clothing, Home, Sports, Beauty, Books, Toys, Food]
+      unit_price:
+        type: number
+        description: Current unit price in USD
+        required: true
+        exclusiveMinimum: 0
+        maximum: 99999.99
+      currency:
+        type: string
+        description: ISO 4217 currency code
+        required: true
+        enum: [USD, EUR, GBP]
+        default: USD
+      is_available:
+        type: boolean
+        description: Whether the product is currently available for sale
+        required: true
+        default: true
+      created_at:
+        type: timestamp
+        description: Record creation timestamp
+        required: true
+    quality:
+      - type: uniqueness
+        field: product_code
+      - type: range
+        field: unit_price
+        min: 0.01
+
+  orders:
+    type: table
+    description: Customer order transactions. Append-only.
+    fields:
+      order_id:
+        type: integer
+        description: Surrogate primary key
+        primaryKey: true
+        unique: true
+        required: true
+      order_code:
+        type: string
+        description: Business order reference number
+        unique: true
+        required: true
+        pattern: "ORD-[0-9]{8}"
+      customer_id:
+        type: integer
+        description: FK to customers.customer_id
+        required: true
+        references: customers.customer_id
+      product_id:
+        type: integer
+        description: FK to products.product_id
+        required: true
+        references: products.product_id
+      quantity:
+        type: integer
+        description: Number of units ordered
+        required: true
+        minimum: 1
+        maximum: 100
+      unit_price_at_order:
+        type: number
+        description: Snapshot of unit price at time of order
+        required: true
+        exclusiveMinimum: 0
+      total_amount:
+        type: number
+        description: quantity * unit_price_at_order
+        required: true
+        exclusiveMinimum: 0
+      order_status:
+        type: string
+        description: Current status of the order
+        required: true
+        enum: [pending, confirmed, shipped, delivered, cancelled, returned]
+        default: pending
+      order_date:
+        type: date
+        description: Date the order was placed
+        required: true
+      created_at:
+        type: timestamp
+        description: Record creation timestamp
+        required: true
+    quality:
+      - type: referential_integrity
+        field: customer_id
+        references: customers.customer_id
+      - type: referential_integrity
+        field: product_id
+        references: products.product_id
+      - type: custom
+        expression: "total_amount = quantity * unit_price_at_order"
+
+serviceLevel:
+  availability: "99.9%"
+  freshness: daily

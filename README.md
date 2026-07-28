@@ -119,7 +119,7 @@ Default models per provider:
 | Provider | `fast` | `smart` | API key |
 |---|---|---|---|
 | `anthropic` | `claude-haiku-4-5-20251001` | `claude-sonnet-5` | `ANTHROPIC_API_KEY` |
-| `gemini` | `gemini/gemini-2.5-flash` | `gemini/gemini-2.5-pro` | `GEMINI_API_KEY` |
+| `gemini` | `gemini/gemini-flash-latest` | `gemini/gemini-pro-latest` | `GEMINI_API_KEY` |
 
 To run on Gemini, set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` in your `.env` — no code changes needed.
 The `gemini/` prefix on the default model ids routes CrewAI to its Google provider; `requirements.txt`

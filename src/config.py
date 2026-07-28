@@ -48,8 +48,10 @@ _PROVIDER_MODELS = {
         "smart": "claude-sonnet-5",
     },
     "gemini": {
-        "fast":  "gemini/gemini-2.5-flash",
-        "smart": "gemini/gemini-2.5-pro",
+        # "latest" aliases always resolve to a currently-available model —
+        # pinned 2.5-* ids get gated ("no longer available to new users").
+        "fast":  "gemini/gemini-flash-latest",
+        "smart": "gemini/gemini-pro-latest",
     },
 }
 

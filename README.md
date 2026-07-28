@@ -22,8 +22,9 @@ Seven agents run in sequence:
 ## Prerequisites
 
 - Python 3.11+ (native to your CPU architecture — see the Apple Silicon note below)
-- An [Anthropic API key](https://console.anthropic.com/) with access to Claude, since every agent is backed
-  by a Claude model via CrewAI's `LLM` class
+- An API key for your chosen LLM provider (every agent is backed by an LLM via CrewAI's `LLM` class):
+  - **Anthropic** (default) — an [Anthropic API key](https://console.anthropic.com/) with access to Claude
+  - **Gemini** — a [Google AI Studio API key](https://aistudio.google.com/apikey)
 
 ### Apple Silicon (M1/M2/M3/M4) note
 
@@ -49,7 +50,9 @@ pip install -r requirements.txt
 
 # 3. Configure your API key
 cp .env.example .env
-# then edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+# then edit .env:
+#   - Anthropic (default): set ANTHROPIC_API_KEY=sk-ant-...
+#   - Gemini             : set LLM_PROVIDER=gemini and GEMINI_API_KEY=...
 
 # 4. Seed the reference DuckDB files the pipeline reads from
 #    (creates data/reference.duckdb and data/cleansed_scd2.duckdb)
@@ -98,6 +101,29 @@ Tunable knobs live in [src/config.py](src/config.py):
 To generate data for a different domain, point `CONTRACT_PATH` at a different ODCS YAML file — the pipeline
 infers Faker strategies and SCD2-tracked fields from field names/types/constraints, so no custom
 annotations are required in the contract.
+
+### Choosing an LLM provider
+
+Every agent runs on one of two model tiers — a cheap `fast` model for the deterministic tool-calling
+agents and a stronger `smart` model for the analytical agents. Both tiers are provider-agnostic and
+selected with environment variables (see [.env.example](.env.example)):
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `LLM_PROVIDER` | `anthropic` | Provider for all agents. One of `anthropic`, `gemini`. |
+| `FAST_MODEL` | provider default | Overrides the fast-tier model id. |
+| `SMART_MODEL` | provider default | Overrides the smart-tier model id. |
+
+Default models per provider:
+
+| Provider | `fast` | `smart` | API key |
+|---|---|---|---|
+| `anthropic` | `claude-haiku-4-5-20251001` | `claude-sonnet-5` | `ANTHROPIC_API_KEY` |
+| `gemini` | `gemini/gemini-2.5-flash` | `gemini/gemini-2.5-pro` | `GEMINI_API_KEY` |
+
+To run on Gemini, set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` in your `.env` — no code changes needed.
+The `gemini/` prefix on the default model ids routes CrewAI to its Google provider; `requirements.txt`
+installs both the `anthropic` and `google-genai` extras so either provider works out of the box.
 
 ## Project layout
 

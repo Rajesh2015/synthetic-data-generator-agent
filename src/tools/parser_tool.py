@@ -22,9 +22,11 @@ def parse_odcs_contract(contract_path: str) -> str:
     # --- datacontract-cli: validate the ODCS v3.1.0 contract ---
     dc = DataContract(data_contract_file=str(path))
     lint_result = dc.lint()
+    lint_passed = _lint_passed(lint_result)
     lint_warnings = [
-        str(c) for c in lint_result.checks if not c.passed
-    ] if not lint_result.passed else []
+        getattr(c, "reason", None) or str(c)
+        for c in lint_result.checks if not _lint_passed(c)
+    ] if not lint_passed else []
 
     # --- raw YAML: access full field data including x- custom extensions ---
     with open(path) as f:
@@ -46,7 +48,7 @@ def parse_odcs_contract(contract_path: str) -> str:
         "id": raw.get("id", "unknown"),
         "apiVersion": api_version,
         "title": raw.get("info", {}).get("title", ""),
-        "lint_passed": lint_result.passed,
+        "lint_passed": lint_passed,
         "lint_warnings": lint_warnings,
         "dependency_order": dependency_order,
         "tables": {},
@@ -87,7 +89,30 @@ def parse_odcs_contract(contract_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Helpers — operate on the raw YAML dict so they work with any ODCS version
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _lint_passed(obj) -> bool:
+    """Whether a datacontract-cli Run or Check passed, tolerant of versions.
+
+    datacontract-cli <1.0 exposed a boolean ``.passed``; 1.0+ replaced it with
+    ``Run.has_passed()`` and a ``.result`` ResultEnum (``ResultEnum.passed`` /
+    ``.failed`` / ``.warning``) on both runs and individual checks.
+    """
+    has_passed = getattr(obj, "has_passed", None)
+    if callable(has_passed):
+        return bool(has_passed())
+    if isinstance(getattr(obj, "passed", None), bool):
+        return obj.passed
+    result = getattr(obj, "result", None)
+    if result is not None:
+        # ResultEnum.passed -> "passed"; also handles plain strings.
+        return str(getattr(result, "value", result)).rsplit(".", 1)[-1].lower() == "passed"
+    return True
+
+
+# ---------------------------------------------------------------------------
+# YAML helpers — operate on the raw dict so they work with any ODCS version
 # ---------------------------------------------------------------------------
 
 def _find_primary_key(fields: dict) -> str | None:

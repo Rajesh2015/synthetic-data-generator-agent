@@ -88,6 +88,28 @@ This kicks off the full crew and prints a validation report, e.g.:
 Output data lands in `data/dev.duckdb`, with `_batch_id` / `_snapshot_date` columns distinguishing the
 initial batch from later SCD2 change batches.
 
+## Running the UI
+
+A [Streamlit](https://streamlit.io/) web UI wraps the same pipeline for non-CLI use:
+
+```bash
+pip install -r requirements.txt      # installs streamlit
+streamlit run app.py                 # opens http://localhost:8501 in your browser
+```
+
+In the UI you can:
+
+- **Pick or upload** an ODCS contract (uploads are saved under `contracts/_uploaded/`).
+- **Run the pipeline** and watch the 7 agents progress live.
+- **View** the validation report and a preview of every generated table (including the SCD2
+  change batches), then **download** the resulting `dev.duckdb`.
+- Optionally **seed reference data** from the sidebar (same as `python -m scripts.seed_reference_data`).
+
+Provider and API key are read from `.env` (shown read-only in the sidebar) — the same
+`LLM_PROVIDER` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` settings as the CLI. To change them,
+edit `.env` and restart the app. Each run resets `data/dev.duckdb` first, so row counts don't
+accumulate across runs.
+
 ## Configuration
 
 Tunable knobs live in [src/config.py](src/config.py):

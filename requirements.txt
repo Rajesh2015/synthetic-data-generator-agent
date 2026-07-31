@@ -1,7 +1,8 @@
-# Both provider extras installed so LLM_PROVIDER can switch at runtime.
-# anthropic  → Claude models (ANTHROPIC_API_KEY)
+# Provider extras installed so LLM_PROVIDER can switch at runtime.
+# anthropic    → Claude models (ANTHROPIC_API_KEY)
 # google-genai → Gemini models (GEMINI_API_KEY)
-crewai[anthropic,google-genai]>=0.80.0
+# openai       → OpenAI models (OPENAI_API_KEY)
+crewai[anthropic,google-genai,openai]>=0.80.0
 faker>=24.0.0
 duckdb>=0.10.0
 pandas>=2.0.0          # required by duckdb .fetchdf() in the profiler/simulator tools

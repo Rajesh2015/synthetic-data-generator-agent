@@ -1,7 +1,8 @@
 # Environment / secrets
 .env
 .env.*
-
+.vscode/
+.env.example
 # Python
 __pycache__/
 *.py[cod]

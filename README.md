@@ -25,6 +25,7 @@ Seven agents run in sequence:
 - An API key for your chosen LLM provider (every agent is backed by an LLM via CrewAI's `LLM` class):
   - **Anthropic** (default) — an [Anthropic API key](https://console.anthropic.com/) with access to Claude
   - **Gemini** — a [Google AI Studio API key](https://aistudio.google.com/apikey)
+  - **OpenAI** — an [OpenAI API key](https://platform.openai.com/) with access to GPT models
 
 ### Apple Silicon (M1/M2/M3/M4) note
 
@@ -53,6 +54,7 @@ cp .env.example .env
 # then edit .env:
 #   - Anthropic (default): set ANTHROPIC_API_KEY=sk-ant-...
 #   - Gemini             : set LLM_PROVIDER=gemini and GEMINI_API_KEY=...
+#   - OpenAI             : set LLM_PROVIDER=openai and OPENAI_API_KEY=...
 
 # 4. Seed the reference DuckDB files the pipeline reads from
 #    (creates data/reference.duckdb and data/cleansed_scd2.duckdb)
@@ -132,7 +134,7 @@ selected with environment variables (see [.env.example](.env.example)):
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `LLM_PROVIDER` | `anthropic` | Provider for all agents. One of `anthropic`, `gemini`. |
+| `LLM_PROVIDER` | `anthropic` | Provider for all agents. One of `anthropic`, `gemini`, `openai`. |
 | `FAST_MODEL` | provider default | Overrides the fast-tier model id. |
 | `SMART_MODEL` | provider default | Overrides the smart-tier model id. |
 
@@ -142,10 +144,11 @@ Default models per provider:
 |---|---|---|---|
 | `anthropic` | `claude-haiku-4-5-20251001` | `claude-sonnet-5` | `ANTHROPIC_API_KEY` |
 | `gemini` | `gemini/gemini-flash-latest` | `gemini/gemini-pro-latest` | `GEMINI_API_KEY` |
+| `openai` | `gpt-4o-mini` | `gpt-4o` | `OPENAI_API_KEY` |
 
 To run on Gemini, set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` in your `.env` — no code changes needed.
-The `gemini/` prefix on the default model ids routes CrewAI to its Google provider; `requirements.txt`
-installs both the `anthropic` and `google-genai` extras so either provider works out of the box.
+To run on OpenAI, set `LLM_PROVIDER=openai` and `OPENAI_API_KEY` in your `.env` — no code changes needed.
+`requirements.txt` installs the `anthropic`, `google-genai`, and `openai` extras so any provider works out of the box.
 
 ## Project layout
 

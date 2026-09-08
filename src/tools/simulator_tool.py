@@ -65,12 +65,20 @@ def simulate_changes(
     )
 
     try:
-        change_patterns: dict = json.loads(change_patterns_json)
+        enrichment: dict = json.loads(change_patterns_json)
     except (json.JSONDecodeError, TypeError):
-        change_patterns = {}
+        enrichment = {}
+
+    # Accept either the full enrichment object (with 'change_tracking' and
+    # 'change_patterns' keys) or a pre-extracted change_patterns section.
+    change_tracking_map = enrichment.get("change_tracking", {})
+    # Per-table field frequencies / co-change patterns live under 'change_patterns'
+    # in the full enrichment object; fall back to the top level for a bare section.
+    per_table_patterns = enrichment.get("change_patterns", enrichment)
 
     conn = duckdb.connect(DB_PATH)
     change_summary = {}
+    skipped = {}
 
     for batch_num in range(2, num_batches + 2):
         snapshot_date = datetime.now().date() + timedelta(days=batch_num - 1)
@@ -79,18 +87,23 @@ def simulate_changes(
         for table_name in contract.models:
             # SCD2-tracked fields come from the LLM enrichment (change_tracking key).
             # No longer read from x-change-tracking annotations in the contract.
-            tracked_fields = change_patterns.get("change_tracking", {}).get(table_name, [])
+            tracked_fields = change_tracking_map.get(table_name, [])
             if not tracked_fields:
+                skipped[table_name] = "no SCD2-tracked fields in change_tracking"
                 continue
 
             try:
                 all_rows = conn.execute(
                     f"SELECT * FROM {table_name} WHERE _batch_id = 1"
                 ).fetchdf()
-            except Exception:
+            except Exception as e:
+                # Surface the reason instead of silently skipping — a missing
+                # pandas/fetchdf dependency used to hide here and yield zero batches.
+                skipped[table_name] = f"query failed: {type(e).__name__}: {e}"
                 continue
 
             if all_rows.empty:
+                skipped[table_name] = "no batch-1 rows to mutate"
                 continue
 
             n_to_change = max(1, int(len(all_rows) * change_rate))
@@ -98,8 +111,8 @@ def simulate_changes(
             changed_rows = changed_rows.copy()
 
             # Use LLM-derived field frequencies if available; else mutate all tracked fields.
-            table_freq = change_patterns.get(table_name, {}).get("field_change_frequency", {})
-            co_patterns = change_patterns.get(table_name, {}).get("co_change_patterns", [])
+            table_freq = per_table_patterns.get(table_name, {}).get("field_change_frequency", {})
+            co_patterns = per_table_patterns.get(table_name, {}).get("co_change_patterns", [])
 
             def _pick_fields_for_record():
                 """Select which fields to mutate for one record."""
@@ -155,6 +168,7 @@ def simulate_changes(
             "batches_generated": num_batches,
             "change_rate": change_rate,
             "summary": change_summary,
+            "skipped_tables": skipped,
             "db_path": DB_PATH,
         },
         indent=2,

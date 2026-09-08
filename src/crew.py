@@ -10,10 +10,13 @@ from src.tools import (
 from src.config import (
     CONTRACT_PATH, SOURCE_DB_PATH, SCD2_DB_PATH,
     NUM_RECORDS, NUM_CHANGE_BATCHES, CHANGE_RATE,
+    FAST_MODEL, SMART_MODEL,
 )
 
-_haiku  = LLM(model="claude-haiku-4-5-20251001")
-_sonnet = LLM(model="claude-sonnet-5")
+# Provider-agnostic (Anthropic / Gemini / …) — see src/config.py.
+# _fast : cheap tool-calling agents; _smart : stronger analytical agents.
+_fast  = LLM(model=FAST_MODEL)
+_smart = LLM(model=SMART_MODEL)
 
 
 # ---------------------------------------------------------------------------
@@ -25,7 +28,7 @@ contract_analyst = Agent(
     goal="Call parse_odcs_contract and return its JSON output.",
     backstory="You parse ODCS YAML contracts and return the structured schema summary.",
     tools=[parse_odcs_contract],
-    llm=_haiku,
+    llm=_fast,
     allow_delegation=False,
     verbose=True,
 )
@@ -35,7 +38,7 @@ data_profiler = Agent(
     goal="Call profile_source_data on the reference DB and return its distribution stats JSON.",
     backstory="You run SQL distribution queries against existing anonymized warehouse data.",
     tools=[profile_source_data],
-    llm=_haiku,
+    llm=_fast,
     allow_delegation=False,
     verbose=True,
 )
@@ -45,7 +48,7 @@ scd2_analyst = Agent(
     goal="Call analyze_scd2_patterns on the SCD2 cleansed layer and return its change-pattern JSON.",
     backstory="You mine existing SCD2 history to find which fields change, how often, and together.",
     tools=[analyze_scd2_patterns],
-    llm=_haiku,
+    llm=_fast,
     allow_delegation=False,
     verbose=True,
 )
@@ -66,7 +69,7 @@ distribution_analyst = Agent(
         "You produce a precise JSON enrichment spec — no prose."
     ),
     tools=[],           # pure LLM reasoning over the stats from prior tasks
-    llm=_sonnet,
+    llm=_smart,
     allow_delegation=False,
     verbose=True,
 )
@@ -76,7 +79,7 @@ data_generator = Agent(
     goal="Call generate_initial_batch with the contract path and enrichment hints. Return its JSON.",
     backstory="You invoke the Faker-based generator. All field values come from Faker, not from you.",
     tools=[generate_initial_batch],
-    llm=_haiku,
+    llm=_fast,
     allow_delegation=False,
     verbose=True,
 )
@@ -86,7 +89,7 @@ change_simulator = Agent(
     goal="Call simulate_changes with the contract path and change patterns. Return its JSON.",
     backstory="You invoke the change simulation tool using the patterns derived from real SCD2 history.",
     tools=[simulate_changes],
-    llm=_haiku,
+    llm=_fast,
     allow_delegation=False,
     verbose=True,
 )
@@ -104,7 +107,7 @@ validation_analyst = Agent(
         "and concrete recommendations."
     ),
     tools=[validate_data],
-    llm=_sonnet,
+    llm=_smart,
     allow_delegation=False,
     verbose=True,
 )
@@ -210,8 +213,11 @@ task_generate = Task(
 task_simulate = Task(
     description=(
         f"Generate {NUM_CHANGE_BATCHES} SCD2 change batches using contract '{CONTRACT_PATH}'. "
-        "Extract the 'change_patterns' section from the enrichment JSON in your context "
-        "and pass it as the change_patterns_json parameter to simulate_changes. "
+        "Pass the ENTIRE enrichment JSON from your context (the object with "
+        "'generation_hints', 'change_tracking', and 'change_patterns' keys) as the "
+        "change_patterns_json parameter to simulate_changes — do NOT extract a sub-section. "
+        "The tool needs 'change_tracking' to know which fields to mutate and "
+        "'change_patterns' for realistic field-change frequencies. "
         "This ensures mutations mirror real production change behaviour — "
         "same natural keys get the same kinds of changes seen in your existing SCD2 data."
     ),

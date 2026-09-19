@@ -15,11 +15,17 @@ _FIELD_MUTATORS = {
     "address_line1": lambda _: fake.street_address(),
     "city": lambda _: fake.city(),
     "country_code": lambda old: random.choice(["US", "GB", "DE", "FR", "AU", "IN", "CA", "SG"]),
-    "status": lambda old: random.choice(["active", "inactive", "suspended"]),
+    "status": lambda old: random.choice(["active", "inactive", "suspended", "contacted", "qualified"]),
     "category": lambda old: random.choice(["Electronics", "Clothing", "Home", "Sports", "Beauty", "Books", "Toys", "Food"]),
     "unit_price": lambda old: round(float(old) * random.uniform(0.85, 1.25), 2),
     "is_available": lambda old: not old,
+    "budget": lambda old: round(float(old or 5000.0) * random.uniform(0.9, 1.3), 2),
+    "channel": lambda old: random.choice(["Search", "Social", "Email", "Display", "Video", "Affiliate"]),
+    "lead_score": lambda old: min(100, max(0, int((old or 50) + random.randint(-15, 15)))),
+    "company": lambda _: fake.company(),
+    "lead_source": lambda old: random.choice(["organic_search", "paid_search", "social_media", "referral", "email_campaign", "webinar", "direct"]),
 }
+
 
 
 def _mutate_field(field_name: str, old_value):

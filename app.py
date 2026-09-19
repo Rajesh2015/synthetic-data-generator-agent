@@ -32,7 +32,11 @@ from src.crew import build_crew
 from src.tools.validator_tool import validate_data
 
 # Which env var holds the key for the configured provider.
-_KEY_ENV = {"anthropic": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY"}
+_KEY_ENV = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "openai": "OPENAI_API_KEY",
+}
 
 CONTRACTS_DIR = ROOT_DIR / "contracts"
 UPLOAD_DIR = CONTRACTS_DIR / "_uploaded"

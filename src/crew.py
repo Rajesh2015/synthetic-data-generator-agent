@@ -225,21 +225,21 @@ def build_crew(
         context=[task_parse, task_enrich],
     )
 
-task_simulate = Task(
-    description=(
-        f"Generate {NUM_CHANGE_BATCHES} SCD2 change batches using contract '{CONTRACT_PATH}'. "
-        "Pass the ENTIRE enrichment JSON from your context (the object with "
-        "'generation_hints', 'change_tracking', and 'change_patterns' keys) as the "
-        "change_patterns_json parameter to simulate_changes — do NOT extract a sub-section. "
-        "The tool needs 'change_tracking' to know which fields to mutate and "
-        "'change_patterns' for realistic field-change frequencies. "
-        "This ensures mutations mirror real production change behaviour — "
-        "same natural keys get the same kinds of changes seen in your existing SCD2 data."
-    ),
-    expected_output="JSON summary: batches_generated, change_rate, per-batch field mutation details.",
-    agent=change_simulator,
-    context=[task_parse, task_enrich, task_generate],
-)
+    task_simulate = Task(
+        description=(
+            f"Generate {NUM_CHANGE_BATCHES} SCD2 change batches using contract '{contract_path}'. "
+            "Pass the ENTIRE enrichment JSON from your context (the object with "
+            "'generation_hints', 'change_tracking', and 'change_patterns' keys) as the "
+            "change_patterns_json parameter to simulate_changes — do NOT extract a sub-section. "
+            "The tool needs 'change_tracking' to know which fields to mutate and "
+            "'change_patterns' for realistic field-change frequencies. "
+            "This ensures mutations mirror real production change behaviour — "
+            "same natural keys get the same kinds of changes seen in your existing SCD2 data."
+        ),
+        expected_output="JSON summary: batches_generated, change_rate, per-batch field mutation details.",
+        agent=change_simulator,
+        context=[task_parse, task_enrich, task_generate],
+    )
 
     task_validate = Task(
         description=(

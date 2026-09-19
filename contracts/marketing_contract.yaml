@@ -54,12 +54,14 @@ models:
         description: Acquisition channel
         required: true
         enum: [Search, Social, Email, Display, Video, Affiliate]
+        x-change-tracking: true
       budget:
         type: number
         description: Total allocated budget in USD
         required: true
         minimum: 500.00
         maximum: 250000.00
+        x-change-tracking: true
       currency:
         type: string
         description: ISO 4217 currency code
@@ -72,6 +74,7 @@ models:
         required: true
         enum: [draft, active, paused, completed, archived]
         default: active
+        x-change-tracking: true
       start_date:
         type: date
         description: Campaign launch date
@@ -123,15 +126,18 @@ models:
         required: true
         unique: true
         format: email
+        x-change-tracking: true
       phone:
         type: string
         description: Contact phone number
         required: false
+        x-change-tracking: true
       company:
         type: string
         description: Organization or company name
         required: false
         maxLength: 100
+        x-change-tracking: true
       campaign_id:
         type: integer
         description: FK to campaigns.campaign_id
@@ -148,12 +154,14 @@ models:
         required: true
         minimum: 0
         maximum: 100
+        x-change-tracking: true
       status:
         type: string
         description: Lifecycle stage of the lead
         required: true
         enum: [new, contacted, qualified, unqualified, converted, lost]
         default: new
+        x-change-tracking: true
       created_at:
         type: timestamp
         description: Record creation timestamp

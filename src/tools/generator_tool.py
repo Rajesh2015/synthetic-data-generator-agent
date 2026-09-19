@@ -85,8 +85,14 @@ def _by_faker_strategy(strategy: str, field_info: dict, field_name: str, uniq: d
         enums = field_info.get("enum") or []
         weights = field_info.get("enum_weights")
         if enums:
-            return random.choices(enums, weights=weights, k=1)[0] if weights else random.choice(enums)
+            if weights and isinstance(weights, list) and len(weights) == len(enums):
+                try:
+                    return random.choices(enums, weights=weights, k=1)[0]
+                except Exception:
+                    return random.choice(enums)
+            return random.choice(enums)
         return None
+
 
     if strategy == "boolean":
         return random.random() > 0.3
@@ -289,7 +295,7 @@ def generate_initial_batch(
     seq: dict = {}
     uniq: dict = {}
     table_counts = {}
-    snapshot_date = datetime.now().date()
+    snapshot_date = datetime.now().date() - timedelta(days=180)
 
     for table_name in contract.get_dependency_order():
         table = contract.models[table_name]

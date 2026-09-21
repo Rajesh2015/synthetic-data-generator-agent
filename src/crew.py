@@ -74,6 +74,23 @@ distribution_analyst = Agent(
     verbose=True,
 )
 
+enrichment_reflector = Agent(
+    role="Synthetic Data Plan Critic",
+    goal=(
+        "Critically inspect the draft enrichment JSON against the parsed contract and return "
+        "a precise, machine-readable list of omissions, contradictions, and unsafe assumptions."
+    ),
+    backstory=(
+        "You are a meticulous reviewer of synthetic-data plans. You do not rewrite the plan or "
+        "add prose. You verify schema coverage, constraint-aware Faker strategies, enum weights, "
+        "SCD2 field eligibility, and change-pattern consistency, then provide targeted corrections."
+    ),
+    tools=[],
+    llm=_fast,
+    allow_delegation=False,
+    verbose=True,
+)
+
 data_generator = Agent(
     role="Synthetic Data Engineer",
     goal="Call generate_initial_batch with the contract path and enrichment hints. Return its JSON.",
@@ -199,21 +216,80 @@ task_enrich = Task(
     context=[task_parse, task_profile, task_analyze_scd2],
 )
 
+task_reflect_enrichment = Task(
+    description=(
+        "Review the draft enrichment JSON against the parsed ODCS schema. This is a bounded "
+        "reflection pass: identify concrete defects for the Distribution & Change Analyst to fix.\n\n"
+        "Check all of the following:\n"
+        "1. The JSON has exactly the required top-level sections: generation_hints, "
+        "change_tracking, and change_patterns.\n"
+        "2. Every table and field in the contract appears under generation_hints and has a valid "
+        "inferred_faker strategy consistent with its PK, FK, enum, pattern, format, type, and name.\n"
+        "3. Every enum_weights list has the same length as its enum, contains only non-negative "
+        "numbers, and has a positive total.\n"
+        "4. change_tracking excludes primary keys, unique natural keys, foreign keys, audit fields, "
+        "and append-only tables. Every tracked field actually exists in its table.\n"
+        "5. change_patterns only reference tracked fields; all frequencies are between 0 and 1; "
+        "and every co-change pattern contains existing tracked fields.\n"
+        "6. Recommendations are grounded in the source profile and SCD2 analysis when those inputs "
+        "contain real observations.\n\n"
+        "Return ONLY JSON with this shape:\n"
+        "{\n"
+        "  \"verdict\": \"PASS\" or \"REVISE\",\n"
+        "  \"issues\": [\n"
+        "    {\"path\": \"JSON path\", \"problem\": \"specific defect\", "
+        "\"fix\": \"specific correction\"}\n"
+        "  ],\n"
+        "  \"checks_passed\": [\"short check name\"]\n"
+        "}\n"
+        "Use PASS only when issues is empty. Do not produce a replacement enrichment document."
+    ),
+    expected_output=(
+        "JSON critique with verdict, issues, and checks_passed. Each issue identifies an exact "
+        "JSON path and an actionable correction."
+    ),
+    agent=enrichment_reflector,
+    context=[task_parse, task_profile, task_analyze_scd2, task_enrich],
+)
+
+task_refine_enrichment = Task(
+    description=(
+        "Produce the final enrichment JSON by revising the draft using every valid issue from the "
+        "reflection critique. Re-check the result yourself before returning it. If the critique "
+        "verdict is PASS, preserve the draft content.\n\n"
+        "Return ONLY the complete corrected JSON object with the same three top-level keys: "
+        "generation_hints, change_tracking, and change_patterns. Do not include the critique, "
+        "markdown fences, commentary, or additional top-level keys."
+    ),
+    expected_output=(
+        "Final corrected JSON with complete generation_hints, valid change_tracking, and internally "
+        "consistent change_patterns, ready for the generator and simulator tools."
+    ),
+    agent=distribution_analyst,
+    context=[
+        task_parse,
+        task_profile,
+        task_analyze_scd2,
+        task_enrich,
+        task_reflect_enrichment,
+    ],
+)
+
 task_generate = Task(
     description=(
         f"Generate {NUM_RECORDS} records per table using contract '{CONTRACT_PATH}'. "
-        "Extract the 'generation_hints' section from the enrichment JSON in your context "
+        "Use the FINAL REVISED enrichment JSON in your context. Extract its 'generation_hints' section "
         "and pass it as the enrichment_json parameter to generate_initial_batch."
     ),
     expected_output="JSON summary: status, batch_id=1, records_generated per table, db_path.",
     agent=data_generator,
-    context=[task_parse, task_enrich],
+    context=[task_parse, task_refine_enrichment],
 )
 
 task_simulate = Task(
     description=(
         f"Generate {NUM_CHANGE_BATCHES} SCD2 change batches using contract '{CONTRACT_PATH}'. "
-        "Pass the ENTIRE enrichment JSON from your context (the object with "
+        "Pass the ENTIRE FINAL REVISED enrichment JSON from your context (the object with "
         "'generation_hints', 'change_tracking', and 'change_patterns' keys) as the "
         "change_patterns_json parameter to simulate_changes — do NOT extract a sub-section. "
         "The tool needs 'change_tracking' to know which fields to mutate and "
@@ -223,7 +299,7 @@ task_simulate = Task(
     ),
     expected_output="JSON summary: batches_generated, change_rate, per-batch field mutation details.",
     agent=change_simulator,
-    context=[task_parse, task_enrich, task_generate],
+    context=[task_parse, task_refine_enrichment, task_generate],
 )
 
 task_validate = Task(
@@ -244,7 +320,7 @@ task_validate = Task(
         "ROOT_CAUSES, SCD2_READINESS, RECOMMENDATIONS."
     ),
     agent=validation_analyst,
-    context=[task_parse, task_enrich, task_generate, task_simulate],
+    context=[task_parse, task_refine_enrichment, task_generate, task_simulate],
 )
 
 
@@ -259,6 +335,7 @@ def build_crew() -> Crew:
             data_profiler,
             scd2_analyst,
             distribution_analyst,
+            enrichment_reflector,
             data_generator,
             change_simulator,
             validation_analyst,
@@ -268,6 +345,8 @@ def build_crew() -> Crew:
             task_profile,
             task_analyze_scd2,
             task_enrich,
+            task_reflect_enrichment,
+            task_refine_enrichment,
             task_generate,
             task_simulate,
             task_validate,

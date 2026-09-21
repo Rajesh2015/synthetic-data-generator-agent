@@ -9,7 +9,7 @@ One-time script to create two reference DuckDB files:
                                field-change patterns.
 
 Run once before the main pipeline:
-  python -m scripts.seed_reference_data
+  uv run python -m scripts.seed_reference_data
 """
 
 import random

@@ -61,8 +61,8 @@ _PROVIDER_MODELS = {
         "smart": "gemini/gemini-pro-latest",
     },
     "openai": {
-        "fast":  "gpt-4o-mini",
-        "smart": "gpt-4o",
+        "fast":  "gpt-5-nano",
+        "smart": "gpt-5-mini",
     },
 }
 

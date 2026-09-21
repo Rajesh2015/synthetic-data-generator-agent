@@ -1,0 +1,240 @@
+apiVersion: v3.1.0
+kind: DataContract
+id: marketing-analytics-contract-v1
+
+info:
+  title: Digital Marketing & Lead Growth Data Contract
+  version: 1.0.0
+  description: >
+    Data contract for marketing analytics entities: marketing campaigns, lead prospects,
+    and ad conversions. Intended for dev/test synthetic data generation with
+    referential integrity and change simulation.
+  owner: growth-marketing-analytics
+  contact:
+    name: Marketing Data Engineering Team
+    email: marketing-data@example.com
+  tags:
+    - marketing
+    - growth
+    - leads
+    - analytics
+    - dev
+
+servers:
+  dev:
+    type: duckdb
+    environment: dev
+    path: ./data/marketing_dev.duckdb
+
+models:
+
+  campaigns:
+    type: table
+    description: Marketing ad campaigns across channels.
+    fields:
+      campaign_id:
+        type: integer
+        description: Surrogate primary key
+        primaryKey: true
+        unique: true
+        required: true
+      campaign_code:
+        type: string
+        description: Business natural key
+        unique: true
+        required: true
+        pattern: "CMP-[0-9]{6}"
+      campaign_name:
+        type: string
+        description: Name of the marketing campaign
+        required: true
+        maxLength: 100
+      channel:
+        type: string
+        description: Acquisition channel
+        required: true
+        enum: [Search, Social, Email, Display, Video, Affiliate]
+        x-change-tracking: true
+      budget:
+        type: number
+        description: Total allocated budget in USD
+        required: true
+        minimum: 500.00
+        maximum: 250000.00
+        x-change-tracking: true
+      currency:
+        type: string
+        description: ISO 4217 currency code
+        required: true
+        enum: [USD, EUR, GBP]
+        default: USD
+      status:
+        type: string
+        description: Campaign execution status
+        required: true
+        enum: [draft, active, paused, completed, archived]
+        default: active
+        x-change-tracking: true
+      start_date:
+        type: date
+        description: Campaign launch date
+        required: true
+      end_date:
+        type: date
+        description: Campaign scheduled end date
+        required: false
+      created_at:
+        type: timestamp
+        description: Record creation timestamp
+        required: true
+    quality:
+      - type: uniqueness
+        field: campaign_code
+      - type: range
+        field: budget
+        min: 500.00
+
+  leads:
+    type: table
+    description: Marketing prospect leads captured via forms and campaigns.
+    fields:
+      lead_id:
+        type: integer
+        description: Surrogate primary key
+        primaryKey: true
+        unique: true
+        required: true
+      lead_code:
+        type: string
+        description: Business natural key
+        unique: true
+        required: true
+        pattern: "LEAD-[0-9]{6}"
+      first_name:
+        type: string
+        description: Lead first name
+        required: true
+        maxLength: 50
+      last_name:
+        type: string
+        description: Lead last name
+        required: true
+        maxLength: 50
+      email:
+        type: string
+        description: Work email address
+        required: true
+        unique: true
+        format: email
+        x-change-tracking: true
+      phone:
+        type: string
+        description: Contact phone number
+        required: false
+        x-change-tracking: true
+      company:
+        type: string
+        description: Organization or company name
+        required: false
+        maxLength: 100
+        x-change-tracking: true
+      campaign_id:
+        type: integer
+        description: FK to campaigns.campaign_id
+        required: true
+        references: campaigns.campaign_id
+      lead_source:
+        type: string
+        description: Traffic source type
+        required: true
+        enum: [organic_search, paid_search, social_media, referral, email_campaign, webinar, direct]
+      lead_score:
+        type: integer
+        description: Quality lead score (0-100)
+        required: true
+        minimum: 0
+        maximum: 100
+        x-change-tracking: true
+      status:
+        type: string
+        description: Lifecycle stage of the lead
+        required: true
+        enum: [new, contacted, qualified, unqualified, converted, lost]
+        default: new
+        x-change-tracking: true
+      created_at:
+        type: timestamp
+        description: Record creation timestamp
+        required: true
+    quality:
+      - type: uniqueness
+        field: lead_code
+      - type: completeness
+        field: email
+        threshold: 1.0
+      - type: referential_integrity
+        field: campaign_id
+        references: campaigns.campaign_id
+
+  conversions:
+    type: table
+    description: Tracked marketing conversion events and revenue attribution. Append-only.
+    fields:
+      conversion_id:
+        type: integer
+        description: Surrogate primary key
+        primaryKey: true
+        unique: true
+        required: true
+      conversion_code:
+        type: string
+        description: Business reference code
+        unique: true
+        required: true
+        pattern: "CONV-[0-9]{8}"
+      campaign_id:
+        type: integer
+        description: FK to campaigns.campaign_id
+        required: true
+        references: campaigns.campaign_id
+      lead_id:
+        type: integer
+        description: FK to leads.lead_id
+        required: true
+        references: leads.lead_id
+      conversion_type:
+        type: string
+        description: Action taken by lead
+        required: true
+        enum: [signup, demo_request, purchase, download, subscription]
+      conversion_value:
+        type: number
+        description: Monetized value of conversion in USD
+        required: true
+        minimum: 0.00
+        maximum: 50000.00
+      attribution_model:
+        type: string
+        description: Touchpoint attribution model
+        required: true
+        enum: [first_touch, last_touch, linear, time_decay, position_based]
+        default: last_touch
+      conversion_date:
+        type: date
+        description: Date conversion occurred
+        required: true
+      created_at:
+        type: timestamp
+        description: Record creation timestamp
+        required: true
+    quality:
+      - type: referential_integrity
+        field: campaign_id
+        references: campaigns.campaign_id
+      - type: referential_integrity
+        field: lead_id
+        references: leads.lead_id
+
+serviceLevel:
+  availability: "99.9%"
+  freshness: daily

@@ -58,20 +58,24 @@ models:
         required: true
         unique: true
         format: email
+        x-change-tracking: true
       phone:
         type: string
         description: Contact phone number
         required: false
+        x-change-tracking: true
       address_line1:
         type: string
         description: Primary street address
         required: false
         maxLength: 100
+        x-change-tracking: true
       city:
         type: string
         description: City
         required: false
         maxLength: 50
+        x-change-tracking: true
       country_code:
         type: string
         description: ISO 3166-1 alpha-2 country code
@@ -79,12 +83,14 @@ models:
         minLength: 2
         maxLength: 2
         enum: [US, GB, DE, FR, AU, IN, CA, SG]
+        x-change-tracking: true
       status:
         type: string
         description: Customer account status
         required: true
         enum: [active, inactive, suspended]
         default: active
+        x-change-tracking: true
       created_at:
         type: timestamp
         description: Record creation timestamp
@@ -122,12 +128,14 @@ models:
         description: Product category
         required: true
         enum: [Electronics, Clothing, Home, Sports, Beauty, Books, Toys, Food]
+        x-change-tracking: true
       unit_price:
         type: number
         description: Current unit price in USD
         required: true
         exclusiveMinimum: 0
         maximum: 99999.99
+        x-change-tracking: true
       currency:
         type: string
         description: ISO 4217 currency code
@@ -139,6 +147,7 @@ models:
         description: Whether the product is currently available for sale
         required: true
         default: true
+        x-change-tracking: true
       created_at:
         type: timestamp
         description: Record creation timestamp

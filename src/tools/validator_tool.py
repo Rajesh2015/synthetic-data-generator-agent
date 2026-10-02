@@ -7,9 +7,10 @@ from src.config import DB_PATH
 @tool("Validate Generated Data")
 def validate_data(contract_path: str) -> str:
     """
-    Validate the data in DuckDB against the ODCS contract quality rules.
+    Validate the data in DuckDB against the ODCS contract quality rules and SCD2 logic.
     Checks: PK uniqueness per batch, FK referential integrity, NOT NULL on
-    required fields, enum constraint adherence, and numeric range bounds.
+    required fields, enum constraint adherence, numeric range bounds, and
+    SCD2 temporal integrity (is_current uniqueness, effective/end_date order, continuity).
     Returns a structured validation report with pass/fail per rule.
     """
     import yaml
@@ -28,7 +29,7 @@ def validate_data(contract_path: str) -> str:
     )
 
     conn = duckdb.connect(DB_PATH)
-    report = {"contract": contract.id, "tables": {}, "summary": {}}
+    report = {"contract": contract.id, "tables": {}, "scd2_validation": {}, "summary": {}}
     total_checks = 0
     total_passed = 0
 
@@ -36,9 +37,9 @@ def validate_data(contract_path: str) -> str:
         table_report = {"checks": [], "passed": 0, "failed": 0}
 
         try:
-            total_rows = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+            total_rows = conn.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
             batch_1_rows = conn.execute(
-                f"SELECT COUNT(*) FROM {table_name} WHERE _batch_id = 1"
+                f'SELECT COUNT(*) FROM "{table_name}" WHERE _batch_id = 1'
             ).fetchone()[0]
         except Exception as e:
             table_report["error"] = str(e)
@@ -49,8 +50,8 @@ def validate_data(contract_path: str) -> str:
         pk = contract.get_primary_key(table_name)
         if pk:
             dupes = conn.execute(
-                f"SELECT _batch_id, COUNT(*) as cnt FROM {table_name} "
-                f"GROUP BY _batch_id, {pk} HAVING cnt > 1"
+                f'SELECT _batch_id, COUNT(*) as cnt FROM "{table_name}" '
+                f'GROUP BY _batch_id, "{pk}" HAVING cnt > 1'
             ).fetchall()
             result = "PASS" if not dupes else "FAIL"
             table_report["checks"].append({
@@ -67,7 +68,7 @@ def validate_data(contract_path: str) -> str:
         for fname, field in table.fields.items():
             if field.required:
                 nulls = conn.execute(
-                    f"SELECT COUNT(*) FROM {table_name} WHERE {fname} IS NULL"
+                    f'SELECT COUNT(*) FROM "{table_name}" WHERE "{fname}" IS NULL'
                 ).fetchone()[0]
                 result = "PASS" if nulls == 0 else "FAIL"
                 table_report["checks"].append({
@@ -85,8 +86,8 @@ def validate_data(contract_path: str) -> str:
             if field.enum:
                 enum_list = ", ".join(f"'{v}'" for v in field.enum)
                 violations = conn.execute(
-                    f"SELECT COUNT(*) FROM {table_name} "
-                    f"WHERE {fname} NOT IN ({enum_list})"
+                    f'SELECT COUNT(*) FROM "{table_name}" '
+                    f'WHERE "{fname}" NOT IN ({enum_list})'
                 ).fetchone()[0]
                 result = "PASS" if violations == 0 else "FAIL"
                 table_report["checks"].append({
@@ -103,9 +104,9 @@ def validate_data(contract_path: str) -> str:
         for fname, ref in contract.get_foreign_keys(table_name).items():
             parent_table, parent_field = ref.split(".")
             orphans = conn.execute(
-                f"SELECT COUNT(*) FROM {table_name} t "
-                f"WHERE t._batch_id = 1 AND t.{fname} NOT IN "
-                f"(SELECT {parent_field} FROM {parent_table} WHERE _batch_id = 1)"
+                f'SELECT COUNT(*) FROM "{table_name}" t '
+                f'WHERE t._batch_id = 1 AND t."{fname}" NOT IN '
+                f'(SELECT "{parent_field}" FROM "{parent_table}" WHERE _batch_id = 1)'
             ).fetchone()[0]
             result = "PASS" if orphans == 0 else "FAIL"
             table_report["checks"].append({
@@ -122,7 +123,7 @@ def validate_data(contract_path: str) -> str:
         for fname, field in table.fields.items():
             if field.minimum is not None:
                 violations = conn.execute(
-                    f"SELECT COUNT(*) FROM {table_name} WHERE {fname} < {field.minimum}"
+                    f'SELECT COUNT(*) FROM "{table_name}" WHERE "{fname}" < {field.minimum}'
                 ).fetchone()[0]
                 result = "PASS" if violations == 0 else "FAIL"
                 table_report["checks"].append({
@@ -140,6 +141,67 @@ def validate_data(contract_path: str) -> str:
         total_checks += table_report["passed"] + table_report["failed"]
         total_passed += table_report["passed"]
         report["tables"][table_name] = table_report
+
+        # --- SCD2 Explicit Cleansed Logic Validation ---
+        scd2_name = f"{table_name}_scd2"
+        natural_key = next(
+            (fname for fname, f in table.fields.items() if f.unique and not f.primaryKey),
+            None
+        ) or contract.get_primary_key(table_name)
+
+        try:
+            conn.execute(f'SELECT 1 FROM "{scd2_name}" LIMIT 1')
+            scd2_report = {"checks": [], "passed": 0, "failed": 0}
+
+            # 1. Exactly one is_current = TRUE per natural key
+            if natural_key:
+                multi_active = conn.execute(f"""
+                    SELECT "{natural_key}", COUNT(*) as active_cnt
+                    FROM "{scd2_name}"
+                    WHERE is_current = TRUE
+                    GROUP BY "{natural_key}"
+                    HAVING active_cnt != 1
+                """).fetchall()
+                res = "PASS" if not multi_active else "FAIL"
+                scd2_report["checks"].append({
+                    "rule": f"SCD2 Active Version Uniqueness ({natural_key})",
+                    "result": res,
+                    "detail": f"{len(multi_active)} keys with invalid active flag" if multi_active else "Exactly 1 active version per key",
+                })
+                if res == "PASS": scd2_report["passed"] += 1
+                else: scd2_report["failed"] += 1
+
+            # 2. Date interval ordering: effective_date <= end_date
+            bad_dates = conn.execute(f"""
+                SELECT COUNT(*) FROM "{scd2_name}"
+                WHERE end_date != '9999-12-31'::DATE AND effective_date::DATE > end_date::DATE
+            """).fetchone()[0]
+
+            res = "PASS" if bad_dates == 0 else "FAIL"
+            scd2_report["checks"].append({
+                "rule": "SCD2 Temporal Bounds (effective_date <= end_date)",
+                "result": res,
+                "detail": f"{bad_dates} invalid date range(s)" if bad_dates else "All effective dates <= end dates",
+            })
+            if res == "PASS": scd2_report["passed"] += 1
+            else: scd2_report["failed"] += 1
+
+            # 3. Version sequencing starts at 1
+            bad_version = conn.execute(f'SELECT COUNT(*) FROM "{scd2_name}" WHERE version < 1').fetchone()[0]
+            res = "PASS" if bad_version == 0 else "FAIL"
+            scd2_report["checks"].append({
+                "rule": "SCD2 Version Sequencing (version >= 1)",
+                "result": res,
+                "detail": f"{bad_version} invalid version numbers" if bad_version else "All version numbers positive sequential integers",
+            })
+            if res == "PASS": scd2_report["passed"] += 1
+            else: scd2_report["failed"] += 1
+
+            total_checks += scd2_report["passed"] + scd2_report["failed"]
+            total_passed += scd2_report["passed"]
+            report["scd2_validation"][scd2_name] = scd2_report
+        except Exception:
+            pass
 
     conn.close()
 

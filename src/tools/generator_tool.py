@@ -39,12 +39,19 @@ def _pattern_to_value(pattern: str, used: set) -> str:
             val = f"SKU-{letters}-{random.randint(1000, 9999)}"
         elif pattern == r"ORD-[0-9]{8}":
             val = f"ORD-{random.randint(10000000, 99999999)}"
+        elif pattern == r"CMP-[0-9]{6}":
+            val = f"CMP-{random.randint(100000, 999999)}"
+        elif pattern == r"LEAD-[0-9]{6}":
+            val = f"LEAD-{random.randint(100000, 999999)}"
+        elif pattern == r"CONV-[0-9]{8}":
+            val = f"CONV-{random.randint(10000000, 99999999)}"
         else:
             val = pattern
         if val not in used:
             used.add(val)
             return val
     return val
+
 
 
 def _by_faker_strategy(strategy: str, field_info: dict, field_name: str, uniq: dict, conn) -> any:
@@ -78,8 +85,14 @@ def _by_faker_strategy(strategy: str, field_info: dict, field_name: str, uniq: d
         enums = field_info.get("enum") or []
         weights = field_info.get("enum_weights")
         if enums:
-            return random.choices(enums, weights=weights, k=1)[0] if weights else random.choice(enums)
+            if weights and isinstance(weights, list) and len(weights) == len(enums):
+                try:
+                    return random.choices(enums, weights=weights, k=1)[0]
+                except Exception:
+                    return random.choice(enums)
+            return random.choice(enums)
         return None
+
 
     if strategy == "boolean":
         return random.random() > 0.3
@@ -282,7 +295,7 @@ def generate_initial_batch(
     seq: dict = {}
     uniq: dict = {}
     table_counts = {}
-    snapshot_date = datetime.now().date()
+    snapshot_date = datetime.now().date() - timedelta(days=180)
 
     for table_name in contract.get_dependency_order():
         table = contract.models[table_name]

@@ -12,6 +12,7 @@ from src.config import (
     NUM_RECORDS, NUM_CHANGE_BATCHES, CHANGE_RATE,
     FAST_MODEL, SMART_MODEL,
 )
+from src.enrichment_guardrail import make_enrichment_guardrail
 
 # Provider-agnostic (Anthropic / Gemini / …) — see src/config.py.
 # _fast : cheap tool-calling agents; _smart : stronger analytical agents.
@@ -77,13 +78,14 @@ distribution_analyst = Agent(
 enrichment_reflector = Agent(
     role="Synthetic Data Plan Critic",
     goal=(
-        "Critically inspect the draft enrichment JSON against the parsed contract and return "
-        "a precise, machine-readable list of omissions, contradictions, and unsafe assumptions."
+        "Semantically inspect the validated enrichment JSON against the contract and observed data, "
+        "then return a precise, machine-readable list of domain mismatches and unsafe assumptions."
     ),
     backstory=(
-        "You are a meticulous reviewer of synthetic-data plans. You do not rewrite the plan or "
-        "add prose. You verify schema coverage, constraint-aware Faker strategies, enum weights, "
-        "SCD2 field eligibility, and change-pattern consistency, then provide targeted corrections."
+        "You are a meticulous semantic reviewer of synthetic-data plans. Deterministic code has already "
+        "checked schema coverage, strategy support, numeric bounds, and referential eligibility. You focus "
+        "on what code cannot establish: whether Faker meanings fit the business fields, assumptions are "
+        "grounded in observed data, and the proposed SCD2 behavior is realistic."
     ),
     tools=[],
     llm=_fast,
@@ -232,25 +234,24 @@ def build_crew(
         ),
         agent=distribution_analyst,
         context=[task_parse, task_profile, task_analyze_scd2],
+        guardrail=make_enrichment_guardrail(contract_path),
+        guardrail_max_retries=2,
     )
 
     task_reflect_enrichment = Task(
         description=(
-            "Review the draft enrichment JSON against the parsed ODCS schema. This is a bounded "
-            "reflection pass: identify concrete defects for the Distribution & Change Analyst to fix.\n\n"
+            "Review the deterministically validated enrichment JSON against the parsed ODCS schema, source "
+            "profile, and SCD2 analysis. This is a bounded semantic reflection pass: identify concrete "
+            "defects for the Distribution & Change Analyst to fix.\n\n"
             "Check all of the following:\n"
-            "1. The JSON has exactly the required top-level sections: generation_hints, "
-            "change_tracking, and change_patterns.\n"
-            "2. Every table and field in the contract appears under generation_hints and has a valid "
-            "inferred_faker strategy consistent with its PK, FK, enum, pattern, format, type, and name.\n"
-            "3. Every enum_weights list has the same length as its enum, contains only non-negative "
-            "numbers, and has a positive total.\n"
-            "4. change_tracking excludes primary keys, unique natural keys, foreign keys, audit fields, "
-            "and append-only tables. Every tracked field actually exists in its table.\n"
-            "5. change_patterns only reference tracked fields; all frequencies are between 0 and 1; "
-            "and every co-change pattern contains existing tracked fields.\n"
-            "6. Recommendations are grounded in the source profile and SCD2 analysis when those inputs "
-            "contain real observations.\n\n"
+            "1. Each Faker strategy is semantically appropriate for the field name and description, "
+            "especially where several valid providers were plausible.\n"
+            "2. Enum weights and numeric assumptions reflect the source profile when it contains real "
+            "observations; defaults are reasonable when it does not.\n"
+            "3. SCD2-tracked fields and co-change behavior make business sense and agree with observed "
+            "history when it is available.\n"
+            "4. The plan contains no cross-field contradictions, misleading business semantics, or unsafe "
+            "domain assumptions that deterministic validation could not detect.\n\n"
             "Return ONLY JSON with this shape:\n"
             "{\n"
             "  \"verdict\": \"PASS\" or \"REVISE\",\n"
@@ -291,6 +292,8 @@ def build_crew(
             task_enrich,
             task_reflect_enrichment,
         ],
+        guardrail=make_enrichment_guardrail(contract_path, use_jev=False),
+        guardrail_max_retries=2,
     )
 
     task_generate = Task(

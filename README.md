@@ -13,8 +13,10 @@ Eight agents run in sequence across nine tasks:
    fields change, how often, and which change together.
 4. **Distribution & Change Analyst** — drafts concrete generation hints (Faker strategy per field, enum
    weights, SCD2 change patterns) by inferring from field names, types, constraints, and observed data.
-5. **Synthetic Data Plan Critic** — runs one cheap, bounded reflection pass over that draft, checking schema
-   coverage, constraints, enum weights, tracked fields, and change-pattern consistency.
+5. **Deterministic enrichment guardrail + Synthetic Data Plan Critic** — code first checks schema coverage,
+   supported Faker strategies, constraints, enum weights, tracked fields, and change-pattern consistency.
+   When `JEV_API_KEY` is configured, ambiguous string fields are resolved with one batched Jev Choice request.
+   The critic then performs the narrower semantic review that benefits from open-ended reasoning.
 6. **Distribution & Change Analyst** — revises the draft once using the critic's findings. Only this final
    plan is passed downstream.
 7. **Synthetic Data Engineer** — generates the first batch of fake rows into `data/dev.duckdb`.
@@ -142,6 +144,10 @@ Default models per provider:
 | `anthropic` | `claude-haiku-4-5-20251001` | `claude-sonnet-5` | `ANTHROPIC_API_KEY` |
 | `gemini` | `gemini/gemini-flash-latest` | `gemini/gemini-pro-latest` | `GEMINI_API_KEY` |
 | `openai` | `gpt-5-nano` | `gpt-5-mini` | `OPENAI_API_KEY` |
+
+Jev is optional. Set `JEV_API_KEY` to enable bounded Faker-strategy decisions for ambiguous string fields;
+without it, the deterministic guardrail and existing critic continue to work normally. `JEV_MODEL`,
+`JEV_MIN_CONFIDENCE`, and `JEV_TIMEOUT_SECONDS` can be used to tune that integration.
 
 To run on Gemini, set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` in your `.env` — no code changes needed.
 To run on OpenAI, set `LLM_PROVIDER=openai` and `OPENAI_API_KEY` in your `.env` — no code changes needed.

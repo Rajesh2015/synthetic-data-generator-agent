@@ -11,6 +11,34 @@ fake = Faker()
 Faker.seed(42)
 random.seed(42)
 
+# Public strategy contract shared with the enrichment-plan validator.  Keeping
+# this list next to the dispatcher prevents an LLM (or Jev) from selecting a
+# plausible-sounding Faker provider that the generator cannot execute.
+SUPPORTED_FAKER_STRATEGIES = frozenset({
+    "sequence",
+    "foreign_key",
+    "enum",
+    "regex",
+    "email",
+    "first_name",
+    "last_name",
+    "name",
+    "phone_number",
+    "street_address",
+    "city",
+    "country_code",
+    "product_name",
+    "company",
+    "word",
+    "boolean",
+    "price",
+    "integer",
+    "past_date",
+    "past_datetime",
+    "computed",
+    "derived_from_parent",
+})
+
 # ODCS v3.1.0 type names → DuckDB types
 ODCS_TO_DUCKDB = {
     # v3.1.0 types
@@ -65,10 +93,13 @@ def _by_faker_strategy(strategy: str, field_info: dict, field_name: str, uniq: d
 
     if strategy == "first_name":  return fake.first_name()
     if strategy == "last_name":   return fake.last_name()
+    if strategy == "name":        return fake.name()
     if strategy == "city":        return fake.city()
     if strategy == "street_address": return fake.street_address()
+    if strategy == "country_code":   return fake.country_code()
     if strategy == "product_name":   return fake.catch_phrase()
     if strategy == "company":        return fake.company()
+    if strategy == "word":           return fake.word()
     if strategy == "phone_number":
         return f"+{fake.numerify(text='##########')}"
 
@@ -216,10 +247,11 @@ def _get_value(field_name: str, field_info: dict, seq: dict, uniq: dict, conn) -
 
     # 2. LLM-inferred strategy (set by Distribution Analyst via enrichment JSON)
     strategy = field_info.get("inferred_faker")
-    if strategy:
+    if strategy in SUPPORTED_FAKER_STRATEGIES:
         return _by_faker_strategy(strategy, field_info, field_name, uniq, conn)
 
-    # 3. Type + name heuristics — works on any bare ODCS contract
+    # 3. Type + name heuristics — also recovers safely if this function is
+    # called directly with enrichment that did not pass the crew guardrail.
     return _fallback_by_type(field_name, field_info, uniq, conn)
 
 
